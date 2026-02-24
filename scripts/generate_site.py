@@ -25,6 +25,7 @@ def build_html() -> str:
   <div class=\"card\">
     <h1>CI/CD Demo deployed by GitHub Actions</h1>
     <p>This page is generated during the <strong>CD</strong> job.</p>
+    <p>testing</p>
     <ul>
       <li>Build time: <code>{build_time}</code></li>
       <li>Sample calculation: <code>20 + 22 = {sample_sum}</code></li>
