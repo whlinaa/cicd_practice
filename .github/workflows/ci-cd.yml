@@ -1,78 +1,131 @@
+# Workflow display name shown in the Actions tab.
 name: CI CD Demo
 
+# Trigger conditions (events) for this workflow.
 on:
+  # Run this workflow when code is pushed to main.
   push:
     branches: [main]
+  # Also run on pull requests targeting main.
   pull_request:
     branches: [main]
+  # Allow manual trigger from the GitHub UI (Actions tab).
   workflow_dispatch:
 
+# Default token permissions for all jobs in this workflow.
+# Principle of least privilege: only read repository contents unless a job needs more.
 permissions:
   contents: read
 
 jobs:
+  # First job: quality gate (lint + tests).
   ci:
+    # Job name shown in GitHub UI.
     name: Lint and Test
+    # Runner image used to execute this job.
     runs-on: ubuntu-latest
     steps:
+      # Step 1: download repository code into the runner workspace.
       - name: Checkout
+        # Reusable action from GitHub Marketplace: owner/repo@version
+        # actions/checkout checks out your repo so later steps can access files.
         uses: actions/checkout@v4
 
+      # Step 2: install Python and enable pip dependency cache.
       - name: Setup Python
+        # setup-python configures the requested Python version on the runner.
         uses: actions/setup-python@v5
         with:
+          # Quoted string; pinning a major/minor version makes runs reproducible.
           python-version: "3.12"
+          # Cache pip downloads to speed up subsequent workflow runs.
           cache: "pip"
+          # File used as cache key input; cache invalidates when this file changes.
           cache-dependency-path: requirements-dev.txt
 
+      # Step 3: install project dependencies needed for linting/testing.
       - name: Install dependencies
+        # Multi-line shell script with YAML block scalar '|'.
+        # By default on Ubuntu runners, this runs in bash.
         run: |
+          # Use Python module invocation to ensure pip matches selected interpreter.
           python -m pip install --upgrade pip
+          # Install dev dependencies (e.g., pytest, ruff).
           python -m pip install -r requirements-dev.txt
 
+      # Step 4: static analysis (lint) to enforce code quality/style.
       - name: Lint
+        # Fails the step/job if Ruff reports issues.
         run: ruff check .
 
+      # Step 5: run unit tests.
       - name: Test
         env:
+          # Job/step-level environment variable.
+          # Adds src/ to Python import path so tests can import package modules.
           PYTHONPATH: src
+        # -q = quiet output for cleaner CI logs.
         run: pytest -q
 
+  # Second job: deployment (only after CI passes on main branch push).
   cd:
+    # Job name shown in GitHub UI.
     name: Deploy to GitHub Pages
+    # Conditional execution using GitHub expression syntax.
+    # Only run deploy job for push events on refs/heads/main.
+    # This prevents deployment on pull_request runs.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Declare dependency: cd starts only if ci succeeds.
     needs: ci
     runs-on: ubuntu-latest
+    # Override/add permissions required specifically for GitHub Pages deployment.
     permissions:
+      # Needed for checkout and reading repository files.
       contents: read
+      # Needed to publish artifacts/pages deployment.
       pages: write
+      # Needed by OIDC authentication flow for secure deployment token exchange.
       id-token: write
+    # Associate job with GitHub Environment "github-pages".
+    # url value is populated from a previous step output.
     environment:
       name: github-pages
+      # Expression syntax: ${{ ... }} evaluates at workflow runtime.
+      # steps.<id>.outputs.<name> references outputs from a step with id.
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      # Checkout again because each job runs on a fresh runner VM.
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Install Python for site generation script.
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      # Build static content before uploading to Pages.
       - name: Generate static site
         env:
+          # Ensure script can import code from src/.
           PYTHONPATH: src
+        # Generates/updates files inside site/.
         run: python scripts/generate_site.py
 
+      # Prepare Pages deployment metadata and configuration on the runner.
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      # Upload generated static files as deployable artifact.
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # Directory containing the final static website files.
           path: site
 
+      # Deploy uploaded artifact to GitHub Pages.
       - name: Deploy
+        # Step id allows later references like steps.deployment.outputs.*
         id: deployment
         uses: actions/deploy-pages@v4
