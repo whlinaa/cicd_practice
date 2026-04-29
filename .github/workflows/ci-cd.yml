@@ -1,6 +1,13 @@
+# CI/CD workflow for this project.
+#
+# What it does:
+# - Runs CI (lint + unit tests) on pull requests to main and pushes to main.
+# - Deploys the generated static site to GitHub Pages only after CI passes,
+#   and only for direct pushes to main (not for pull requests).
+# - Can also be triggered manually from the GitHub Actions UI.
+
 # Workflow display name shown in the Actions tab.
 name: CI CD Demo
-
 # Trigger conditions (events) for this workflow.
 on:
   # Run this workflow when code is pushed to main.
@@ -72,9 +79,9 @@ jobs:
     # Job name shown in GitHub UI.
     name: Deploy to GitHub Pages
     # Conditional execution using GitHub expression syntax.
-    # Only run deploy job for push events on refs/heads/main.
-    # This prevents deployment on pull_request runs.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Run deploy automatically for pushes to main, or manually via workflow_dispatch.
+    # This still prevents deployment on pull_request runs.
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     # Declare dependency: cd starts only if ci succeeds.
     needs: ci
     runs-on: ubuntu-latest
