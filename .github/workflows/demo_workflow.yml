@@ -266,7 +266,8 @@ jobs:
           echo "Running database migration..."
 
           # Example fake command
-          python migrate.py
+          # python migrate.py
+          echo "Skipping for now"
 
       # ---------------------------------------------------
       # Example:
@@ -280,10 +281,11 @@ jobs:
           echo "Deploying to environment ${{ inputs.environment }}"
 
           # Example deployment command
-          python deploy.py \
-            --project "$GCP_PROJECT_ID" \
-            --region "$REGION" \
-            --db-password "$DB_PASSWORD"
+          # python deploy.py \
+          #   --project "$GCP_PROJECT_ID" \
+          #   --region "$REGION" \
+          #   --db-password "$DB_PASSWORD"
+          echo "Skipping for now"
 
       # ---------------------------------------------------
       # Example:
