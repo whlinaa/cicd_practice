@@ -3,6 +3,9 @@ from pathlib import Path
 
 from cicd_demo.calculator import add, multiply
 
+import os
+os.environ["PYTHONPATH"] = "src"
+
 
 def build_html() -> str:
     build_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")

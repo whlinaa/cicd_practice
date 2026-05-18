@@ -1,0 +1,330 @@
+# =========================================================
+# FILE: .github/workflows/deploy.yml
+#
+# PURPOSE:
+# Learn GitHub Actions concepts:
+#
+# - workflow_dispatch
+# - inputs
+# - jobs
+# - steps
+# - repository secrets
+# - environment secrets
+# - variables
+# - environment selection
+# - manual deployment workflow
+#
+# SCENARIO:
+# We have an application that can deploy to:
+# - staging
+# - production
+#
+# We use:
+# - Repository Secret:
+#       OPENAI_API_KEY
+#
+# - Environment Secrets:
+#       DB_PASSWORD
+#
+# - Repository Variables:
+#       GCP_PROJECT_ID
+#       REGION
+#
+# IMPORTANT:
+# The SAME secret name DB_PASSWORD exists in BOTH:
+# - staging environment
+# - production environment
+#
+# GitHub automatically chooses the correct one
+# depending on:
+#
+#   environment: ${{ inputs.environment }}
+#
+# =========================================================
+
+name: Manual Deploy Workflow
+
+# =========================================================
+# WORKFLOW TRIGGERS
+# =========================================================
+on:
+
+  # -------------------------------------------------------
+  # workflow_dispatch
+  #
+  # Allows manual triggering from GitHub UI:
+  #
+  # Actions
+  # → Select workflow
+  # → Run workflow
+  #
+  # You can customize inputs shown in the UI.
+  # -------------------------------------------------------
+  workflow_dispatch:
+
+    inputs:
+
+      # ---------------------------------------------------
+      # Choose deployment environment
+      # ---------------------------------------------------
+      environment:
+        description: "Where should we deploy?"
+        required: true
+        type: choice
+
+        # Dropdown options in GitHub UI
+        options:
+          - staging
+          - production
+
+        default: staging
+
+      # ---------------------------------------------------
+      # Application version
+      # Example:
+      #   v1.2.0
+      # ---------------------------------------------------
+      version:
+        description: "Application version to deploy"
+        required: true
+        default: "latest"
+
+      # ---------------------------------------------------
+      # Boolean checkbox
+      # ---------------------------------------------------
+      run_database_migration:
+        description: "Run DB migration?"
+        required: true
+        type: boolean
+        default: false
+
+      # ---------------------------------------------------
+      # Another dropdown example
+      # ---------------------------------------------------
+      log_level:
+        description: "Deployment log verbosity"
+        required: true
+        type: choice
+        options:
+          - info
+          - debug
+          - warning
+        default: info
+
+# =========================================================
+# JOBS
+# =========================================================
+jobs:
+
+  # =======================================================
+  # DEPLOY JOB
+  # =======================================================
+  deploy:
+
+    # -----------------------------------------------------
+    # Runner machine
+    #
+    # GitHub creates a temporary Ubuntu VM
+    # -----------------------------------------------------
+    runs-on: ubuntu-latest
+
+    # -----------------------------------------------------
+    # IMPORTANT:
+    #
+    # This determines WHICH environment is used.
+    #
+    # If user selected:
+    #   production
+    #
+    # Then GitHub loads:
+    #   production environment secrets
+    #
+    # If user selected:
+    #   staging
+    #
+    # Then GitHub loads:
+    #   staging environment secrets
+    # -----------------------------------------------------
+    environment: ${{ inputs.environment }}
+
+    # =====================================================
+    # ENVIRONMENT VARIABLES
+    # =====================================================
+    env:
+
+      # ---------------------------------------------------
+      # Repository Variable
+      #
+      # Non-sensitive config
+      # ---------------------------------------------------
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+
+      # ---------------------------------------------------
+      # Another Repository Variable
+      # ---------------------------------------------------
+      REGION: ${{ vars.REGION }}
+
+      # ---------------------------------------------------
+      # Repository Secret
+      #
+      # Shared across all environments
+      #
+      # Example:
+      # OpenAI API key used everywhere
+      # ---------------------------------------------------
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      # ---------------------------------------------------
+      # Environment Secret
+      #
+      # IMPORTANT:
+      #
+      # The actual value depends on environment:
+      #
+      # staging environment:
+      #     DB_PASSWORD=staging-password
+      #
+      # production environment:
+      #     DB_PASSWORD=production-password
+      #
+      # SAME YAML
+      # DIFFERENT SECRET VALUE
+      # ---------------------------------------------------
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    # =====================================================
+    # STEPS
+    # =====================================================
+    steps:
+
+      # ---------------------------------------------------
+      # Checkout repository code
+      # ---------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------
+      # Show workflow inputs
+      # ---------------------------------------------------
+      - name: Show selected options
+        run: |
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Run migration: ${{ inputs.run_database_migration }}"
+          echo "Log level: ${{ inputs.log_level }}"
+
+      # ---------------------------------------------------
+      # Example:
+      # Using repository variables
+      # ---------------------------------------------------
+      - name: Show repository variables
+        run: |
+          echo "Project ID: $GCP_PROJECT_ID"
+          echo "Region: $REGION"
+
+      # ---------------------------------------------------
+      # Example:
+      # Using repository secret
+      #
+      # IMPORTANT:
+      # Never print actual secrets in real projects.
+      #
+      # GitHub usually masks them with ***
+      # ---------------------------------------------------
+      - name: Verify OpenAI API key exists
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Missing OPENAI_API_KEY"
+            exit 1
+          fi
+
+          echo "OPENAI_API_KEY exists"
+
+      # ---------------------------------------------------
+      # Example:
+      # Using environment secret
+      # ---------------------------------------------------
+      - name: Verify DB password exists
+        run: |
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "Missing DB_PASSWORD"
+            exit 1
+          fi
+
+          echo "DB_PASSWORD exists"
+
+      # ---------------------------------------------------
+      # Example:
+      # Conditional step
+      #
+      # Runs ONLY if checkbox was selected
+      # ---------------------------------------------------
+      - name: Run database migration
+        if: ${{ inputs.run_database_migration }}
+
+        run: |
+          echo "Running database migration..."
+
+          # Example fake command
+          python migrate.py
+
+      # ---------------------------------------------------
+      # Example:
+      # Using secrets inside commands
+      #
+      # Here the shell command consumes the env vars.
+      # ---------------------------------------------------
+      - name: Simulated deployment
+        run: |
+          echo "Deploying version ${{ inputs.version }}"
+          echo "Deploying to environment ${{ inputs.environment }}"
+
+          # Example deployment command
+          python deploy.py \
+            --project "$GCP_PROJECT_ID" \
+            --region "$REGION" \
+            --db-password "$DB_PASSWORD"
+
+      # ---------------------------------------------------
+      # Example:
+      # Python program reading environment variables
+      # ---------------------------------------------------
+      - name: Example Python usage
+        run: |
+
+          python <<EOF
+          import os
+
+          print("Reading environment variables inside Python")
+
+          # Repository variable
+          print("Project:", os.environ["GCP_PROJECT_ID"])
+
+          # Environment secret
+          db_password = os.environ["DB_PASSWORD"]
+
+          # Repository secret
+          api_key = os.environ["OPENAI_API_KEY"]
+
+          print("DB password length:", len(db_password))
+          print("API key exists:", len(api_key) > 0)
+          EOF
+
+      # ---------------------------------------------------
+      # Example:
+      # Different behavior for production
+      # ---------------------------------------------------
+      - name: Production-only safety check
+
+        if: ${{ inputs.environment == 'production' }}
+
+        run: |
+          echo "Production deployment detected"
+          echo "Extra safety checks enabled"
+
+      # ---------------------------------------------------
+      # Final success message
+      # ---------------------------------------------------
+      - name: Finish
+        run: |
+          echo "Deployment completed successfully"
