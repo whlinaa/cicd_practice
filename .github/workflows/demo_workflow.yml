@@ -212,6 +212,10 @@ jobs:
           echo "Version: ${{ inputs.version }}"
           echo "Run migration: ${{ inputs.run_database_migration }}"
           echo "Log level: ${{ inputs.log_level }}"
+          echo "DB_PASSWORD: ${{ secrets.DB_PASSWORD }}"
+          echo "OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}"
+          echo "GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}"
+          echo "REGION: ${{ secrets.REGION }}"
 
       # ---------------------------------------------------
       # Example:
